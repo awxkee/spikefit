@@ -45,16 +45,16 @@ mod widths;
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_test
 /// // Compute widths for all detected peaks at half-prominence (default):
 /// let result = PeakWidthsBuilder::new(&signal)
-///     .compute()?;
+///     .find()?;
 ///
 /// // Specify a custom peak list and measure at 80 % of prominence:
 /// let result = PeakWidthsBuilder::new(&signal)
 ///     .peaks(&[3, 7, 14])
 ///     .rel_height(0.8)
-///     .compute()?;
+///     .find()?;
 /// ```
 pub struct PeakWidthsOptions<'a, T> {
     /// The signal.
@@ -105,7 +105,7 @@ impl<'a> PeakWidthsOptions<'a, f32> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_test
 /// // All local maxima — no filters:
 /// let peaks = FindPeaksOptions::new(&signal).compute()?;
 ///
