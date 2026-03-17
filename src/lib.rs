@@ -94,7 +94,7 @@ impl<'a, T> PeakWidthsOptions<'a, T> {
 
 impl<'a> PeakWidthsOptions<'a, f32> {
     pub fn find(&self) -> Result<SpikefitWidths<f32>, SpikefitError> {
-        peak_widths_f32(self.x, self)
+        peak_widths_f32(self)
     }
 }
 
@@ -288,11 +288,10 @@ pub use widths::SpikefitWidths;
 /// * `peaks` - Indices of peaks in `x`
 /// * `rel_height` - Relative height of the boundary with respect to the peak height (default: 0.5)
 pub fn peak_widths(
-    x: &[f64],
     options: &PeakWidthsOptions<'_, f64>,
 ) -> Result<SpikefitWidths<f64>, SpikefitError> {
     if let Some(peaks) = options.peaks {
-        peak_widths_impl(x, peaks, options.rel_height)
+        peak_widths_impl(options.x, peaks, options.rel_height)
     } else {
         Err(SpikefitError::SignalTooShort { len: 0 })
     }
@@ -306,11 +305,10 @@ pub fn peak_widths(
 /// * `peaks` - Indices of peaks in `x`
 /// * `rel_height` - Relative height of the boundary with respect to the peak height (default: 0.5)
 pub fn peak_widths_f32(
-    x: &[f32],
     options: &PeakWidthsOptions<'_, f32>,
 ) -> Result<SpikefitWidths<f32>, SpikefitError> {
     if let Some(peaks) = options.peaks {
-        peak_widths_impl(x, peaks, options.rel_height)
+        peak_widths_impl(options.x, peaks, options.rel_height)
     } else {
         Err(SpikefitError::SignalTooShort { len: 0 })
     }
@@ -332,12 +330,9 @@ pub fn peak_widths_f32(
 /// # Returns
 ///
 /// * Vector of peak indices
-pub fn find_peaks(
-    x: &[f64],
-    options: FindPeaksOptions<'_, f64>,
-) -> Result<Vec<usize>, SpikefitError> {
+pub fn find_peaks(options: FindPeaksOptions<'_, f64>) -> Result<Vec<usize>, SpikefitError> {
     find_peaks_impl(
-        x,
+        options.x,
         options.height,
         options.threshold,
         options.distance,
@@ -362,12 +357,9 @@ pub fn find_peaks(
 /// # Returns
 ///
 /// * Vector of peak indices
-pub fn find_peaks_f32(
-    x: &[f32],
-    options: FindPeaksOptions<'_, f32>,
-) -> Result<Vec<usize>, SpikefitError> {
+pub fn find_peaks_f32(options: FindPeaksOptions<'_, f32>) -> Result<Vec<usize>, SpikefitError> {
     find_peaks_impl(
-        x,
+        options.x,
         options.height,
         options.threshold,
         options.distance,

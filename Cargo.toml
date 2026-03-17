@@ -1,6 +1,6 @@
 [package]
 name = "spikefit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Peak detection for 1D signals"
 readme = "./README.md"
