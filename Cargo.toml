@@ -1,6 +1,6 @@
 [package]
 name = "spikefit"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Peak detection for 1D signals"
 readme = "./README.md"
@@ -12,7 +12,7 @@ categories = ["science", "algorithms"]
 homepage = "https://github.com/awxkee/spikefit"
 repository = "https://github.com/awxkee/spikefit.git"
 exclude = ["*.jpg", "./assets/*", "*.png"]
-rust-version = "1.89.0"
+rust-version = "1.94.0"
 include = ["/src/", "/README.md", "/LICENSE.md", "/LICENSE-APACHE.md"]
 
 [dependencies]

@@ -68,11 +68,12 @@ where
     let mut peak_indices = Vec::new();
 
     // Simple algorithm to find local maxima
-    for i in 1..x.len() - 1 {
-        if x[i] > x[i - 1] && x[i] > x[i + 1] {
-            peak_indices.push(i);
-        }
-    }
+    peak_indices.extend(
+        x.array_windows::<3>()
+            .enumerate()
+            .filter(|(_, w)| w[1] > w[0] && w[1] > w[2])
+            .map(|(i, _)| i + 1),
+    );
 
     // Handle the last point if it's higher than the previous point (matches test expectations)
     if x.len() >= 2 && x[x.len() - 1] > x[x.len() - 2] {
@@ -103,39 +104,40 @@ where
 
     // Apply distance filter if specified
     if let Some(dist) = distance
-        && dist > 0 {
-            let mut filtered_peaks = Vec::new();
+        && dist > 0
+    {
+        let mut filtered_peaks = Vec::new();
 
-            // Sort peaks by height (highest first)
-            let mut peaks_with_height: Vec<(usize, T)> =
-                peak_indices.iter().map(|&idx| (idx, x[idx])).collect();
-            peaks_with_height
-                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        // Sort peaks by height (highest first)
+        let mut peaks_with_height: Vec<(usize, T)> =
+            peak_indices.iter().map(|&idx| (idx, x[idx])).collect();
+        peaks_with_height
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-            // Keep track of which indices are excluded
-            let mut excluded = vec![false; x.len()];
+        // Keep track of which indices are excluded
+        let mut excluded = vec![false; x.len()];
 
-            for &(idx, _) in &peaks_with_height {
-                if !excluded[idx] {
-                    filtered_peaks.push(idx);
+        for &(idx, _) in &peaks_with_height {
+            if !excluded[idx] {
+                filtered_peaks.push(idx);
 
-                    // Mark off region around peak
-                    let start = idx.saturating_sub(dist);
-                    let end = (idx + dist + 1).min(x.len());
+                // Mark off region around peak
+                let start = idx.saturating_sub(dist);
+                let end = (idx + dist + 1).min(x.len());
 
-                    for (j, exclude) in excluded.iter_mut().enumerate().take(end).skip(start) {
-                        if j != idx {
-                            // Don't exclude the peak itself
-                            *exclude = true;
-                        }
+                for (j, exclude) in excluded.iter_mut().enumerate().take(end).skip(start) {
+                    if j != idx {
+                        // Don't exclude the peak itself
+                        *exclude = true;
                     }
                 }
             }
-
-            // Sort peaks by index
-            filtered_peaks.sort_unstable();
-            peak_indices = filtered_peaks;
         }
+
+        // Sort peaks by index
+        filtered_peaks.sort_unstable();
+        peak_indices = filtered_peaks;
+    }
 
     // Apply prominence filter if specified
     if let Some(prom) = prominence {
@@ -170,4 +172,174 @@ where
     }
 
     Ok(peak_indices)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    fn peaks(x: &[f64]) -> Vec<usize> {
+        find_peaks_impl(x, None, None, None, None, None).unwrap()
+    }
+
+    // ── basic local maxima ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_single_peak() {
+        assert_eq!(peaks(&[0.0, 1.0, 0.0]), vec![1]);
+    }
+
+    #[test]
+    fn test_multiple_peaks() {
+        assert_eq!(peaks(&[0.0, 2.0, 0.0, 3.0, 0.0, 1.0, 0.0]), vec![1, 3, 5]);
+    }
+
+    #[test]
+    fn test_no_peaks_flat() {
+        assert_eq!(peaks(&[1.0, 1.0, 1.0, 1.0]), vec![]);
+    }
+
+    #[test]
+    fn test_no_peaks_monotone_increasing() {
+        assert_eq!(peaks(&[1.0, 2.0, 3.0, 4.0]), vec![3]); // last point edge case
+    }
+
+    #[test]
+    fn test_no_peaks_monotone_decreasing() {
+        assert_eq!(peaks(&[4.0, 3.0, 2.0, 1.0]), vec![]);
+    }
+
+    #[test]
+    fn test_last_point_peak() {
+        // last point higher than previous → included
+        assert_eq!(peaks(&[0.0, 1.0, 0.5, 2.0]), vec![1, 3]);
+    }
+
+    #[test]
+    fn test_signal_too_short_returns_error() {
+        assert!(find_peaks_impl(&[1.0f64, 2.0], None, None, None, None, None).is_err());
+        assert!(find_peaks_impl(&[1.0f64], None, None, None, None, None).is_err());
+        assert!(find_peaks_impl(&[] as &[f64], None, None, None, None, None).is_err());
+    }
+
+    #[test]
+    fn test_exactly_three_points() {
+        assert_eq!(peaks(&[0.0, 1.0, 0.0]), vec![1]);
+        assert_eq!(peaks(&[1.0, 0.0, 1.0]), vec![2]);
+    }
+
+    // ── height filter ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_height_filters_low_peaks() {
+        let x = &[0.0, 1.0, 0.0, 3.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, Some(2.0), None, None, None, None).unwrap();
+        assert_eq!(result, vec![3, 5]);
+    }
+
+    #[test]
+    fn test_height_keeps_exact_threshold() {
+        let x = &[0.0, 2.0, 0.0, 3.0, 0.0];
+        let result = find_peaks_impl(x, Some(2.0), None, None, None, None).unwrap();
+        assert_eq!(result, vec![1, 3]);
+    }
+
+    #[test]
+    fn test_height_filters_all() {
+        let x = &[0.0, 1.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, Some(5.0), None, None, None, None).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    // ── threshold filter ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_threshold_basic() {
+        // peak at 1 has diff of 1.0 to neighbors, peak at 3 has diff of 2.0
+        let x = &[0.0, 1.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, None, Some(1.5), None, None, None).unwrap();
+        assert_eq!(result, vec![3]);
+    }
+
+    #[test]
+    fn test_threshold_zero_keeps_all() {
+        let x = &[0.0, 1.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, None, Some(0.0), None, None, None).unwrap();
+        assert_eq!(result, vec![1, 3]);
+    }
+
+    // ── distance filter ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_distance_keeps_highest() {
+        // two close peaks — higher one wins
+        let x = &[0.0, 1.0, 0.0, 3.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, None, None, Some(3), None, None).unwrap();
+        assert_eq!(result, vec![3]);
+    }
+
+    #[test]
+    fn test_distance_far_enough_keeps_both() {
+        let x = &[0.0, 2.0, 0.0, 0.0, 0.0, 3.0, 0.0];
+        let result = find_peaks_impl(x, None, None, Some(3), None, None).unwrap();
+        assert_eq!(result, vec![1, 5]);
+    }
+
+    #[test]
+    fn test_distance_zero_keeps_all() {
+        let x = &[0.0, 1.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, None, None, Some(0), None, None).unwrap();
+        assert_eq!(result, vec![1, 3]);
+    }
+
+    #[test]
+    fn test_prominence_filters_shallow_peak() {
+        let x = &[0.0, 3.0, 4.0, 3.0, 0.0, 5.0, 0.0];
+        let result = find_peaks_impl(x, None, None, None, Some(3.0), None).unwrap();
+        assert_eq!(result, vec![2, 5]);
+    }
+
+    #[test]
+    fn test_prominence_zero_keeps_all() {
+        let x = &[0.0, 1.0, 0.0, 2.0, 0.0];
+        let result = find_peaks_impl(x, None, None, None, Some(0.0), None).unwrap();
+        assert_eq!(result, vec![1, 3]);
+    }
+
+    // ── width filter ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_width_filters_narrow_peak() {
+        // sharp spike vs broad hump
+        let x = &[0.0, 0.0, 3.0, 0.0, 0.0, 1.0, 2.0, 1.0, 0.0];
+        let result = find_peaks_impl(x, None, None, None, None, Some(2.0)).unwrap();
+        assert_eq!(result, vec![6]);
+    }
+
+    #[test]
+    fn test_all_filters_no_peaks_survive() {
+        let x = &[0.0, 1.0, 0.0, 2.0, 0.0, 1.5, 0.0];
+        let result =
+            find_peaks_impl(x, Some(5.0), Some(2.0), Some(4), Some(3.0), Some(3.0)).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    // ── edge shapes ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_plateau_not_detected_as_peak() {
+        // equal neighbors — strict greater-than means no peak
+        assert_eq!(peaks(&[0.0, 1.0, 1.0, 0.0]), vec![]);
+    }
+
+    #[test]
+    fn test_negative_values() {
+        assert_eq!(peaks(&[-3.0, -1.0, -3.0]), vec![1]);
+    }
+
+    #[test]
+    fn test_all_same_value() {
+        assert_eq!(peaks(&[2.0, 2.0, 2.0, 2.0]), vec![]);
+    }
 }

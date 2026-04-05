@@ -26,10 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::err::SpikefitError;
 use crate::SpikefitSample;
-use num_traits::AsPrimitive;
+use crate::err::SpikefitError;
 use crate::prominence::peak_prominences_impl;
+use num_traits::AsPrimitive;
 
 #[derive(Clone, Debug, Default)]
 pub struct SpikefitWidths<T: Default> {
